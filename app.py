@@ -1,6 +1,14 @@
 import streamlit as st
 
-# --- Tiered Pricing Definitions ---
+# Set Streamlit layout and style
+st.set_page_config(page_title="Wilmac Pricing Calculator", layout="centered")
+
+st.markdown("<h1 style='font-size:32px; font-weight:600;'>Wilmac Pricing Configurator</h1>", unsafe_allow_html=True)
+st.markdown("Configure your estimated annual cost based on tier, usage, and add-ons.")
+
+st.markdown("---")
+
+# --- Tier Configuration ---
 tiers = {
     "Basic": {
         "price": 30000,
@@ -28,76 +36,91 @@ tiers = {
     }
 }
 
-# --- Add-On Features ---
 addons = {
     "Extra Channel (Basic only)": 5000,
     "Compliance Bundle (Basic only)": 15000,
     "Extra Connector": 15000,
     "Transcription ($1/hr)": 1.00,
     "Redaction ($0.01/min)": 0.01,
-    "Analytics Module": 60000  # $5,000/month × 12
+    "Analytics Module": 60000
 }
 
-# --- Overage Rates ---
 overage = {
     "record_per_1000": 2.50,
-    "storage_per_gb_month": 0.03
+    "storage_per_gb_per_month": 0.03
 }
 
-# --- Streamlit UI Setup ---
-st.set_page_config("Wilmac Pricing Calculator", layout="centered")
-st.title("📊 Wilmac Pricing Calculator")
-
-# Step 1 – Tier Selection
-tier_choice = st.selectbox("Select Your Tier", list(tiers.keys()))
+# --- SECTION: Tier Selection ---
+st.markdown("### 1. Tier Selection")
+col1, col2 = st.columns([1.3, 1.7])
+with col1:
+    tier_choice = st.radio("", list(tiers.keys()), horizontal=True)
 tier = tiers[tier_choice]
-st.markdown(f"**Included Features**: {', '.join(tier['features'])}")
-st.markdown(f"**Included Volume**: {tier['included_records']:,} records, {tier['included_storage_tb']} TB")
+st.write(f"**Price**: ${tier['price']:,} per year")
+st.write(f"**Included**: {tier['included_records']:,} records, {tier['included_storage_tb']} TB storage")
+st.write(f"**Features**: {', '.join(tier['features'])}")
 
-# Step 2 – Usage Input
-st.subheader("📦 Estimated Usage")
-records = st.number_input("Total Annual Records", min_value=0, value=10_000_000)
-storage_tb = st.number_input("Average Storage (TB)", min_value=0.0, value=5.0, step=0.5)
+st.markdown("---")
 
-# Step 3 – AI Services
-st.subheader("🧠 AI Features")
-transcription_hr = st.number_input("Transcription (hours)", value=0, min_value=0)
-redaction_min = st.number_input("Redaction (minutes)", value=0, min_value=0)
+# --- SECTION: Usage Input ---
+st.markdown("### 2. Usage Inputs")
+col1, col2 = st.columns(2)
+with col1:
+    records = st.number_input("Annual Records", min_value=0, value=10_000_000, step=1_000_000)
+with col2:
+    storage_tb = st.number_input("Average Storage (TB)", min_value=0.0, value=5.0, step=0.5)
 
-# Step 4 – Optional Add-ons
-st.subheader("🔧 Add-On Modules")
-extra_connector = st.checkbox("Add Extra Connector", value=False)
-analytics_module = st.checkbox("Add Analytics Module", value=False)
-extra_channel = st.checkbox("Add Extra Channel (Basic only)", value=False if tier_choice == "Basic" else False, disabled=tier_choice != "Basic")
-compliance_bundle = st.checkbox("Add Compliance Bundle (Basic only)", value=False if tier_choice == "Basic" else False, disabled=tier_choice != "Basic")
+st.markdown("---")
 
-# --- Pricing Logic ---
+# --- SECTION: AI Features ---
+st.markdown("### 3. AI Services")
+col1, col2 = st.columns(2)
+with col1:
+    transcription_hr = st.number_input("Transcription (hours)", min_value=0, value=0)
+with col2:
+    redaction_min = st.number_input("Redaction (minutes)", min_value=0, value=0)
+
+st.markdown("---")
+
+# --- SECTION: Add-ons ---
+st.markdown("### 4. Add-On Options")
+col1, col2 = st.columns(2)
+with col1:
+    add_connector = st.checkbox("Extra Connector", value=False)
+    add_analytics = st.checkbox("Analytics Module", value=False)
+with col2:
+    add_channel = st.checkbox("Extra Channel (Basic only)", value=False if tier_choice == "Basic" else False, disabled=tier_choice != "Basic")
+    add_compliance = st.checkbox("Compliance Bundle (Basic only)", value=False if tier_choice == "Basic" else False, disabled=tier_choice != "Basic")
+
+st.markdown("---")
+
+# --- SECTION: Cost Calculation ---
 base_price = tier["price"]
 included_records = tier["included_records"]
 included_storage_gb = tier["included_storage_tb"] * 1024
 
-# Overages
+# Overage calculations
 record_overage_units = max(0, (records - included_records) / 1000)
 storage_overage_gb = max(0, (storage_tb * 1024 - included_storage_gb))
 record_overage_cost = record_overage_units * overage["record_per_1000"]
-storage_overage_cost = storage_overage_gb * overage["storage_per_gb_month"] * 12  # Annual
+storage_overage_cost = storage_overage_gb * overage["storage_per_gb_per_month"] * 12
 
-# Usage charges
+# Usage-based pricing
 transcription_cost = transcription_hr * addons["Transcription ($1/hr)"]
 redaction_cost = redaction_min * addons["Redaction ($0.01/min)"]
 
-# Optional add-ons
+# Add-on selection
 addon_cost = 0
-if extra_connector:
+if add_connector:
     addon_cost += addons["Extra Connector"]
-if analytics_module:
+if add_analytics:
     addon_cost += addons["Analytics Module"]
-if extra_channel:
+if add_channel:
     addon_cost += addons["Extra Channel (Basic only)"]
-if compliance_bundle:
+if add_compliance:
     addon_cost += addons["Compliance Bundle (Basic only)"]
 
-# Total
+# Final total
 total_price = (
     base_price +
     record_overage_cost +
@@ -107,27 +130,22 @@ total_price = (
     addon_cost
 )
 
-# --- Pricing Summary ---
-st.markdown("---")
-st.subheader("💰 Estimated Pricing Breakdown")
-st.write(f"**Base Tier Price**: ${base_price:,.2f}")
-if record_overage_cost > 0:
-    st.write(f"**Record Overage**: ${record_overage_cost:,.2f}")
-if storage_overage_cost > 0:
-    st.write(f"**Storage Overage**: ${storage_overage_cost:,.2f}")
-if transcription_cost > 0:
-    st.write(f"**Transcription**: ${transcription_cost:,.2f}")
-if redaction_cost > 0:
-    st.write(f"**Redaction**: ${redaction_cost:,.2f}")
-if extra_connector:
-    st.write(f"**Extra Connector**: ${addons['Extra Connector']:,}")
-if analytics_module:
-    st.write(f"**Analytics Module**: ${addons['Analytics Module']:,}")
-if extra_channel:
-    st.write(f"**Extra Channel**: ${addons['Extra Channel (Basic only)']:,}")
-if compliance_bundle:
-    st.write(f"**Compliance Bundle**: ${addons['Compliance Bundle (Basic only)']:,}")
+# --- SECTION: Summary Output ---
+st.markdown("### 5. Pricing Summary")
+st.markdown(f"<div style='font-size:24px; font-weight:bold;'>Estimated Annual Price: ${total_price:,.2f}</div>", unsafe_allow_html=True)
 
-st.markdown(f"### ✅ **Total Estimated Price: ${total_price:,.2f}**")
-st.caption("Built for Wilmac Case Competition – Powered by Streamlit 🚀")
+with st.expander("See detailed breakdown"):
+    st.write(f"Base Tier: ${base_price:,.2f}")
+    if record_overage_cost > 0:
+        st.write(f"Record Overage: ${record_overage_cost:,.2f}")
+    if storage_overage_cost > 0:
+        st.write(f"Storage Overage: ${storage_overage_cost:,.2f}")
+    if transcription_cost > 0:
+        st.write(f"Transcription: ${transcription_cost:,.2f}")
+    if redaction_cost > 0:
+        st.write(f"Redaction: ${redaction_cost:,.2f}")
+    if addon_cost > 0:
+        st.write(f"Add-ons Total: ${addon_cost:,.2f}")
 
+st.markdown("<hr>", unsafe_allow_html=True)
+st.caption("This pricing model is designed for demo purposes for the Wilmac case competition.")
